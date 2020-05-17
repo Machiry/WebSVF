@@ -16,7 +16,8 @@ fs.readFile("bugReportInstance.txt", (err, data) => {
 })
 
 function analyzeData(output) {
-    var bugreports = [];
+    var bugreports;
+    var bugreportsArray = [];
     var outputToArray = output.split("OutputEnd");
     outputToArray.pop();
     outputToArray.forEach((element, index) => {
@@ -45,7 +46,10 @@ function analyzeData(output) {
             errors.push(neverFree);
         });
         var bugreport = new BugReport(id, fileName, filePath, errors);
-        bugreports.push(bugreport);
+        bugreportsArray.push(bugreport);
+        bugreports = {
+            "bugreports" : bugreportsArray
+        };
     });
     fs.writeFile("Bug-Analysis-Report.json", JSON.stringify(bugreports, null, 4), function(){
         console.log("Generate JSON success");
