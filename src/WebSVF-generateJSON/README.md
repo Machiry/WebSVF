@@ -4,11 +4,11 @@
 
 *3. Run following command line in the root path of SVF.*  
 
-      `node generateBCFile.js your_path_of_c_dir`  
+      node generateBCFile.js your_path_of_c_dir  
       
-      `node generateBugTxt.js`  
+      node generateBugTxt.js  
       
-      `node generateJSON.js`  
+      node generateJSON.js  
       
 *4. Bug-Analysis-Report.json will be generated at the root path of SVF.*  
 
