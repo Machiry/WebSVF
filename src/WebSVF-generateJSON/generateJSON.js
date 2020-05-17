@@ -1,58 +1,66 @@
-var exec = require('child_process').exec;
 var fs = require('fs');
+var exec = require('child_process').exec;
 
-var arguments = process.argv.splice(2);
-var filePath = arguments[0];
-var regex = /\(([^)]*)\)/;
-var commend = 'saber -leak -stat=false ' + filePath;
-
-exec(commend, (err, stdout, stderr) => sendJSONFile(stderr));
-
-function sendJSONFile(output) {
-    if (output.search('PartialLeak') == -1) {
-        console.log('Invalid file path.');
-        return null;
+class BugReport {
+    constructor(id, FileName, FilePath, Errors) {
+        this.id = id;
+        this.FileName = FileName;
+        this.FilePath = FilePath;
+        this.Errors = Errors;
     }
-    var outputToArray = output.split('\n');
-    var transitionArray_1 = outputToArray.slice(outputToArray.length - 5, outputToArray.length - 2);
-    var transitionArray_2 = [];
+}
 
-    for (var s in transitionArray_1) {
-        var str = transitionArray_1[s];
-        var arr = str.match(regex);
-        transitionArray_2.push(arr);
-    }
+fs.readFile("bugReportInstance.txt", (err, data) => {
+    if (err) return console.log("Fail: " + err.message);
+    analyzeData(data.toString());
+})
 
-    var transitionArray_3 = [
-        transitionArray_2[0][1],
-        transitionArray_2[2][1]
-    ];
-
-    var resultArray = [];
-    for (var l in transitionArray_3) {
-        var content = transitionArray_3[l];
-        var num = getNum(content, "ln: ", " fl");
-        var fileName = getNum(content, "fl: ", "");
-        var obj = {
-            'line' : num,
-            'file' : fileName
-        };
-        resultArray[l] = obj;
-    }
-    var resultJSONArray = [];
-    resultJSONArray[0] = {
-        "Memory allocation" : resultArray[0],
-        "Conditional free path" : resultArray[1]
-    };
-    fs.writeFile("report.json", JSON.stringify(resultJSONArray, null, 4), function(){
+function analyzeData(output) {
+    var bugreports = [];
+    var outputToArray = output.split("OutputEnd");
+    outputToArray.pop();
+    outputToArray.forEach((element, index) => {
+        console.log("----------\n" + element + "\n--------------");
+        var id = index;
+        var filePath = getParenthesesStr(element).split("fl: ").pop();
+        var fileName = filePath.split("/").pop();
+        var array_1 = element.split("NeverFree");
+        if (element.indexOf("PartialLeak") == -1) {
+            var neverFreeArray = array_1;
+            var partialLeakString = [];
+            neverFreeArray.shift();
+        } else {
+            var partialLeakString = array_1.pop().split("PartialLeak");
+            var neverFreeArray = array_1;
+            neverFreeArray.shift();
+        }
+        var errors = [];
+        partialLeakString.splice(0,1);
+        partialLeakString.forEach(element => {
+            var partialLeak = analyzePLError(element);
+            errors.push(partialLeak);
+        });
+        neverFreeArray.forEach(element => {
+            var neverFree = analyzeNFError(element);
+            errors.push(neverFree);
+        });
+        var bugreport = new BugReport(id, fileName, filePath, errors);
+        bugreports.push(bugreport);
+    });
+    fs.writeFile("Bug-Analysis-Report.json", JSON.stringify(bugreports, null, 4), function(){
         console.log("Generate JSON success");
+        exec("sudo rm bugReportInstance.txt");
+        exec("sudo rm -rf bcFiles");
     });
 }
 
-
+function getParenthesesStr(text) {
+    text.match(/\((.+)\)/g);
+    return RegExp.$1;
+}
 
 function getNum(str,firstStr,secondStr){
-    if (str == "" || str == null || str == undefined){ // "",null,undefined
+    if (str == "" || str == null || str == undefined){
         return "";
     }
     if (str.indexOf(firstStr)<0){
@@ -65,4 +73,48 @@ function getNum(str,firstStr,secondStr){
         var subSecondStr=subFirstStr.substring(0, subFirstStr.indexOf(secondStr));
         return subSecondStr;
     }
+}
+
+function analyzePLError(partialLeak) {
+    var array_1 = partialLeak.split("conditional free path:");
+    var freePathArray = array_1.pop().split("\n"); 
+    freePathArray.pop();
+    freePathArray.pop();
+    freePathArray.shift();
+    var memoryAllocationString = getParenthesesStr(array_1[0]);
+    var memoryAllocationLine = getNum(memoryAllocationString, "ln: ", " fl");
+    var memoryAllocationPath = getNum(memoryAllocationString, "fl: ", ")");
+    var memoryAllocation = {
+        "ln": memoryAllocationLine,
+        "FilePath": memoryAllocationPath
+    }
+    var freePath = [];
+    freePathArray.forEach(element => {
+        var freePathLine = getNum(element, "ln: ", " fl");
+        var freePathPath = getNum(element, "fl: ", ")");
+        var freePathEle = {
+            "ln": freePathLine,
+            "FilePath": freePathPath
+        }
+        freePath.push(freePathEle);
+    });
+    var error = {
+        "Type": "PartialLeak",
+        "Memory allocation" : memoryAllocation,
+        "Free path": freePath
+    }
+    return error;
+}
+
+function analyzeNFError(neverFree) {
+    var neverFreeLine = getNum(neverFree, "ln: ", " fl");
+    var naverFreePath = getNum(neverFree, "fl: ", ")");
+    var error = {
+        "Type": "NeverFree",
+        "Memory allocation": {
+            "ln": neverFreeLine,
+            "FilePath": naverFreePath
+        }
+    };
+    return error;
 }
