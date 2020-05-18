@@ -3,6 +3,7 @@
 *2. Move the generateJSON.js, generateBugTxt.js, generateBCFile.js to the root path of SVF.*  
 
 *3. Run following command line in the root path of SVF.*  
+
       . ./setup.sh
 
       node generateBCFile.js your_path_of_c_project_dir  
