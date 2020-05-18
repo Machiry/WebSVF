@@ -17,7 +17,7 @@ function readFileList(dir, filesList = []) {
 }
 
 var bcFilesList = [];
-var __bcFilesDir = "/home/pie/SVFTools/SVF/bcFiles";
+var __bcFilesDir = "bcFiles";
 readFileList(__bcFilesDir, bcFilesList);
 
 bcFilesList.forEach(element => {
