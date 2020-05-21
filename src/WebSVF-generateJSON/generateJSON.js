@@ -3,7 +3,7 @@ var fs = require('fs');
 var exec = require('child_process').exec;
 var path = require('path');
 var arguments = process.argv.splice(2);
-var projectPath = "";
+var projectPath = arguments[0] + "/";
 exec(". ./setup.sh");
 String.prototype.endWith = function(endStr) {
     var d = this.length-endStr.length;
@@ -31,65 +31,68 @@ filesList.forEach(element => {
 });
 
 //Step 3: Loop bcFilesList and generate bug reports
-var index = 0;
 bcFilesList.forEach(element => {
     console.log(element);
     var commend = 'saber -leak -stat=false ' + element;
     exec(commend, (err, stdout, stderr) => {
-        if (stderr != "") {
-            var data = index + "\n\n" + stderr.toString() + element + "\nOutputEnd\n";
-            index++;
-            analyzeData(data.toString());
+        if (stderr != "" && !(stderr.indexOf("failed") != -1)) {
+            analyzeData_1(stderr.toString());
         }
     });
 });
 
 //Functions used in process
-function analyzeData(output) {
+function analyzeData_1(output) {
     var bugreports;
     var bugreportsArray = [];
-    var outputToArray = output.split("OutputEnd");
-    outputToArray.pop();
-    outputToArray.forEach(element => {
-        var errorStringArray = element.split("\n\n");
-        var id = errorStringArray.shift();
-
-        var filePathString_1 = errorStringArray.pop().toString();
-        var filePathString_2 = filePathString_1.substring(0, filePathString_1.length -1);
-        var index_1 = filePathString_2.lastIndexOf("/");
-        var filePath = filePathString_2.substring(0, index_1);
-        projectPath = filePath;
-
-        var index_2 = filePath.lastIndexOf("/");
-        var fileName = filePath.substring(index_2 + 1, filePath.length);
-        
-        var partialLeakArray = [];
-        var neverFreeArray = [];
-        errorStringArray.forEach(element => {
-            if (element.indexOf("PartialLeak") != -1) {
-                partialLeakArray.push(element);
-            }
-            if (element.indexOf("NeverFree") != -1) {
-                neverFreeArray.push(element);
-            }
-        });
-        var errors = [];
-        partialLeakArray.forEach(element => {
-            var partialLeak = analyzePLError(element);
-            errors.push(partialLeak);
-        })
-        neverFreeArray.forEach(element => {
-            var neverFree = analyzeNFError(element);
-            errors.push(neverFree);
-        });
-        var bugreport = new BugReport(id, fileName, filePath, errors);
-        bugreportsArray.push(bugreport);
-        bugreports = {
-            "bugreports" : bugreportsArray
-        };
+    var errors = [];
+    var errorStringArray_1 = output.split("\n\n");
+    errorStringArray_1.pop();
+    //console.log(errorStringArray.length);
+    var errorStringArray = [];
+    errorStringArray_1.forEach(element => {
+        if (element.indexOf("PartialLeak") != -1 && element.indexOf("NeverFree") != -1) {
+            var array = element.split("\n");
+            errorStringArray.push(array.shift());
+            var partialLeakString = array.join("\n");
+            errorStringArray.push(partialLeakString);
+        } else {
+            errorStringArray.push(element);
+        }
     });
-    fs.writeFile(projectPath + "/Bug-Analysis-Report.json", JSON.stringify(bugreports, null, 2), function(){
-        console.log(projectPath + "/Bug-Analysis-Report.json");
+    errorStringArray.forEach(element => {
+        console.log("-------------------------\n" + element);
+        var error;
+        if (element.indexOf("PartialLeak") != -1) {
+            error = analyzePLError(element);
+        }
+        if (element.indexOf("NeverFree") != -1) {
+            error = analyzeNFError(element);
+        }
+        errors.push(error);
+    });
+    var pathArray = [];
+    errors.forEach(element => {
+        pathArray.push(element.Path);
+    });
+    var pathSet = unique(pathArray);
+
+    pathSet.forEach((path, index) => {
+        var errorsByReport = [];
+        errors.forEach(element => {
+            if (element.Path == path) {
+                delete element.Path;
+                errorsByReport.push(element);
+            }
+        })
+        var bugreport = new BugReport(index, path, projectPath + path, errorsByReport);
+        bugreportsArray.push(bugreport);
+    });
+    bugreports = {
+        "bugreport" : bugreportsArray
+    };
+    fs.writeFile(projectPath + "Bug-Analysis-Report.json", JSON.stringify(bugreports, null, 2), function(){
+        console.log(projectPath + "Bug-Analysis-Report.json");
         console.log("Generate Bug-Analysis-Report.json successfully");
     });
 }
@@ -122,38 +125,50 @@ function analyzePLError(partialLeak) {
     var memoryAllocationString = getParenthesesStr(array_1[0]);
     var memoryAllocationLine = getContent(memoryAllocationString, "ln: ", " fl");
     var memoryAllocationPath = getContent(memoryAllocationString, "fl: ", "");
-    var memoryAllocation = {
-        "ln": memoryAllocationLine,
-        "FilePath": memoryAllocationPath
-    }
-    var freePath = [];
+    var stackTrace = [];
+    var crossOrigin = [];
+
     freePathArray.forEach(element => {
-        var freePathLine = getContent(element, "ln: ", " fl");
         var freePathPath = getContent(element, "fl: ", ")");
-        var freePathEle = {
-            "ln": freePathLine,
-            "FilePath": freePathPath
+        if (freePathPath == memoryAllocationPath) {
+            var freePathLine = getContent(element, "ln: ", " fl");
+            var freePathEle = {
+                "ln": freePathLine,
+                "title": "Conditional free path"
+            }
+            stackTrace.push(freePathEle);
+        } else {
+            var freePathLine = getContent(element, "ln: ", " fl");
+            var freePathEle = {
+                "FileName": freePathPath,
+                "FilePath": "Absolute Path",
+                "ln": freePathLine
+            }
+            crossOrigin.push(freePathEle);
         }
-        freePath.push(freePathEle);
     });
     var error = {
-        "Type": "PartialLeak",
-        "Memory allocation" : memoryAllocation,
-        "Free path": freePath
+        "ln": memoryAllocationLine,
+        "Type": "Semantic",
+        "Occurrence": "Dynamic (Run-Time)",
+        "Title": "PartialLeak: Memory allocation",
+        "Stack Trace": stackTrace,
+        "Cross Origin": crossOrigin
     }
+    error.Path = memoryAllocationPath;
     return error;
 }
 
 function analyzeNFError(neverFree) {
     var neverFreeLine = getContent(neverFree, "ln: ", " fl");
-    var naverFreePath = getContent(neverFree, "fl: ", ")");
+    var neverFreePath = getContent(neverFree, "fl: ", ")");
     var error = {
-        "Type": "NeverFree",
-        "Memory allocation": {
-            "ln": neverFreeLine,
-            "FilePath": naverFreePath
-        }
+        "ln": neverFreeLine,
+        "Type": "Semantic",
+        "Occurrence": "Dynamic (Run-Time)",
+        "Title": "NeverFree: memory allocation",
     };
+    error.Path = neverFreePath;
     return error;
 }
 
@@ -165,4 +180,8 @@ function readFileList(dir, filesList = []) {
         filesList.push(fullPath);
     });
     return filesList;
+}
+
+function unique (arr) {
+    return Array.from(new Set(arr))
 }
