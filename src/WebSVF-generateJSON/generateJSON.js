@@ -3,6 +3,8 @@ var fs = require('fs');
 var exec = require('child_process').exec;
 var path = require('path');
 var arguments = process.argv.splice(2);
+var projectPath = "";
+exec(". ./setup.sh");
 String.prototype.endWith = function(endStr) {
     var d = this.length-endStr.length;
     return (d >= 0 && this.lastIndexOf(endStr) == d);
@@ -56,6 +58,7 @@ function analyzeData(output) {
         var filePathString_2 = filePathString_1.substring(0, filePathString_1.length -1);
         var index_1 = filePathString_2.lastIndexOf("/");
         var filePath = filePathString_2.substring(0, index_1);
+        projectPath = filePath;
 
         var index_2 = filePath.lastIndexOf("/");
         var fileName = filePath.substring(index_2 + 1, filePath.length);
@@ -85,7 +88,8 @@ function analyzeData(output) {
             "bugreports" : bugreportsArray
         };
     });
-    fs.writeFile("Bug-Analysis-Report.json", JSON.stringify(bugreports, null, 2), function(){
+    fs.writeFile(projectPath + "/Bug-Analysis-Report.json", JSON.stringify(bugreports, null, 2), function(){
+        console.log(projectPath + "/Bug-Analysis-Report.json");
         console.log("Generate Bug-Analysis-Report.json successfully");
     });
 }
@@ -114,8 +118,6 @@ function getContent(str,firstStr,secondStr){
 function analyzePLError(partialLeak) {
     var array_1 = partialLeak.split("conditional free path:");
     var freePathArray = array_1.pop().split("\n"); 
-    freePathArray.pop();
-    freePathArray.pop();
     freePathArray.shift();
     var memoryAllocationString = getParenthesesStr(array_1[0]);
     var memoryAllocationLine = getContent(memoryAllocationString, "ln: ", " fl");
