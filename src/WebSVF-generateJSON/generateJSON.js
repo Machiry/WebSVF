@@ -1,6 +1,12 @@
+//Step 1: Init
 var fs = require('fs');
 var exec = require('child_process').exec;
-
+var path = require('path');
+var arguments = process.argv.splice(2);
+String.prototype.endWith = function(endStr) {
+    var d = this.length-endStr.length;
+    return (d >= 0 && this.lastIndexOf(endStr) == d);
+}
 class BugReport {
     constructor(id, FileName, FilePath, Errors) {
         this.id = id;
@@ -10,37 +16,65 @@ class BugReport {
     }
 }
 
-fs.readFile("bugReportInstance.txt", (err, data) => {
-    if (err) return console.log("Fail: " + err.message);
-    analyzeData(data.toString());
-})
+//Step 2: Scan the target dir to get all .bc files.
+var bcFilesList = [];
 
+var filesList = [];
+var filesDir = arguments[0];
+readFileList(filesDir, filesList);
+filesList.forEach(element => {
+    if (element.endWith(".bc")) {
+        bcFilesList.push(element);
+    }
+});
+
+//Step 3: Loop bcFilesList and generate bug reports
+var index = 0;
+bcFilesList.forEach(element => {
+    console.log(element);
+    var commend = 'saber -leak -stat=false ' + element;
+    exec(commend, (err, stdout, stderr) => {
+        if (stderr != "") {
+            var data = index + "\n\n" + stderr.toString() + element + "\nOutputEnd\n";
+            index++;
+            analyzeData(data.toString());
+        }
+    });
+});
+
+//Functions used in process
 function analyzeData(output) {
     var bugreports;
     var bugreportsArray = [];
     var outputToArray = output.split("OutputEnd");
     outputToArray.pop();
-    outputToArray.forEach((element, index) => {
-        console.log("----------\n" + element + "\n--------------");
-        var id = index;
-        var filePath = getParenthesesStr(element).split("fl: ").pop();
-        var fileName = filePath.split("/").pop();
-        var array_1 = element.split("NeverFree");
-        if (element.indexOf("PartialLeak") == -1) {
-            var neverFreeArray = array_1;
-            var partialLeakString = [];
-            neverFreeArray.shift();
-        } else {
-            var partialLeakString = array_1.pop().split("PartialLeak");
-            var neverFreeArray = array_1;
-            neverFreeArray.shift();
-        }
+    outputToArray.forEach(element => {
+        var errorStringArray = element.split("\n\n");
+        var id = errorStringArray.shift();
+
+        var filePathString_1 = errorStringArray.pop().toString();
+        var filePathString_2 = filePathString_1.substring(0, filePathString_1.length -1);
+        var index_1 = filePathString_2.lastIndexOf("/");
+        var filePath = filePathString_2.substring(0, index_1);
+
+        var index_2 = filePath.lastIndexOf("/");
+        var fileName = filePath.substring(index_2 + 1, filePath.length);
+        
+        var partialLeakArray = [];
+        var neverFreeArray = [];
+        errorStringArray.forEach(element => {
+            if (element.indexOf("PartialLeak") != -1) {
+                partialLeakArray.push(element);
+            }
+            if (element.indexOf("NeverFree") != -1) {
+                neverFreeArray.push(element);
+            }
+        });
         var errors = [];
-        partialLeakString.splice(0,1);
-        partialLeakString.forEach(element => {
+        partialLeakArray.forEach(element => {
             var partialLeak = analyzePLError(element);
             errors.push(partialLeak);
-        });
+        })
         neverFreeArray.forEach(element => {
             var neverFree = analyzeNFError(element);
             errors.push(neverFree);
@@ -51,10 +85,8 @@ function analyzeData(output) {
             "bugreports" : bugreportsArray
         };
     });
-    fs.writeFile("Bug-Analysis-Report.json", JSON.stringify(bugreports, null, 4), function(){
-        console.log("Generate JSON success");
-        exec("sudo rm bugReportInstance.txt");
-        exec("sudo rm -rf bcFiles");
+    fs.writeFile("Bug-Analysis-Report.json", JSON.stringify(bugreports, null, 2), function(){
+        console.log("Generate Bug-Analysis-Report.json successfully");
     });
 }
 
@@ -63,7 +95,7 @@ function getParenthesesStr(text) {
     return RegExp.$1;
 }
 
-function getNum(str,firstStr,secondStr){
+function getContent(str,firstStr,secondStr){
     if (str == "" || str == null || str == undefined){
         return "";
     }
@@ -86,16 +118,16 @@ function analyzePLError(partialLeak) {
     freePathArray.pop();
     freePathArray.shift();
     var memoryAllocationString = getParenthesesStr(array_1[0]);
-    var memoryAllocationLine = getNum(memoryAllocationString, "ln: ", " fl");
-    var memoryAllocationPath = getNum(memoryAllocationString, "fl: ", ")");
+    var memoryAllocationLine = getContent(memoryAllocationString, "ln: ", " fl");
+    var memoryAllocationPath = getContent(memoryAllocationString, "fl: ", "");
     var memoryAllocation = {
         "ln": memoryAllocationLine,
         "FilePath": memoryAllocationPath
     }
     var freePath = [];
     freePathArray.forEach(element => {
-        var freePathLine = getNum(element, "ln: ", " fl");
-        var freePathPath = getNum(element, "fl: ", ")");
+        var freePathLine = getContent(element, "ln: ", " fl");
+        var freePathPath = getContent(element, "fl: ", ")");
         var freePathEle = {
             "ln": freePathLine,
             "FilePath": freePathPath
@@ -111,8 +143,8 @@ function analyzePLError(partialLeak) {
 }
 
 function analyzeNFError(neverFree) {
-    var neverFreeLine = getNum(neverFree, "ln: ", " fl");
-    var naverFreePath = getNum(neverFree, "fl: ", ")");
+    var neverFreeLine = getContent(neverFree, "ln: ", " fl");
+    var naverFreePath = getContent(neverFree, "fl: ", ")");
     var error = {
         "Type": "NeverFree",
         "Memory allocation": {
@@ -121,4 +153,14 @@ function analyzeNFError(neverFree) {
         }
     };
     return error;
+}
+
+function readFileList(dir, filesList = []) {
+    const files = fs.readdirSync(dir);
+    files.forEach((item, index) => {
+        var fullPath = path.join(dir, item);
+        const stat = fs.statSync(fullPath);
+        filesList.push(fullPath);
+    });
+    return filesList;
 }
