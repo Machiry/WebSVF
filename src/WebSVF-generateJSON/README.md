@@ -1,16 +1,16 @@
-*1. Setup nodeJS and SVF.*  
+1. Setup nodeJS and SVF.*  
 
-*2. Move the generateJSON.js to the root path of SVF.*  
+2. Move the generateJSON.js to the root path of SVF.*  
 
-*3. Use WLLVM to compile a C project to LLVM Bitcode (.bc) file.*  
+3. Use WLLVM to compile a C project to LLVM Bitcode (.bc) file.*  
 
-*3. Run following command line in the root path of SVF.*  
+4. Run following command line in the root path of SVF.*  
 
 
       node generateJSON.js your_path_of_c_project  
       
       
-*4. Bug-Analysis-Report.json will be generated at the root path of SVF.*  
+5. Bug-Analysis-Report.json will be generated at the root path of your C project.*  
 
 The example of your_path_of_c_project: (Make sure you have compile a C project to LLVM Bitcode (.bc) successfully).*  
 
