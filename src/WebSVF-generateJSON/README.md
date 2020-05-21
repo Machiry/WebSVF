@@ -1,18 +1,19 @@
 *1. Setup nodeJS and SVF.*  
 
-*2. Move the generateJSON.js, generateBugTxt.js, generateBCFile.js to the root path of SVF.*  
+*2. Move the generateJSON.js to the root path of SVF.*  
+
+*3. Use WLLVM to compile a C project to LLVM Bitcode (.bc) file.*  
 
 *3. Run following command line in the root path of SVF.*  
 
-      . ./setup.sh
 
-      node generateBCFile.js your_path_of_c_project_dir  
+      node generateJSON.js your_path_of_c_project  
       
-      node generateBugTxt.js  
-      
-      node generateJSON.js  
       
 *4. Bug-Analysis-Report.json will be generated at the root path of SVF.*  
-(Currently it can only work with multiple c files in one folder, but not the complex C project.)*  
-Note: your_path_of_c_Project_dir should be a folder's path. (Eg: /home/pie/Test-Suite/mem_leak
-) And make sure each c files in this folder can be compile by clang.
+
+The example of your_path_of_c_project: (Make sure you have compile a C project to LLVM Bitcode (.bc) successfully).*  
+
+      node generateJSON.js /home/pie/Downloads/pkg-config-0.26
+
+The way to compile a C project to LLVM Bitcode (.bc): [Detecting memory leaks](https://github.com/SVF-tools/SVF/wiki/Detecting-memory-leaks) (Step 2)
