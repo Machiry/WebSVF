@@ -95,6 +95,7 @@ function analyzeData_1(output) {
         })
         absolutePath = absolutePath.substring(0, absolutePath.lastIndexOf("/"));
         var bugreport = new BugReport(index, path, absolutePath, errorsByReport);
+        bugreport = sortErrorByLine(bugreport);
         bugreportsArray.push(bugreport);
     });
     bugreports = {
@@ -218,4 +219,19 @@ function readAllFileList(dir, filesList = []) {
         }        
     });
     return filesList;
+}
+
+function sortErrorByLine(bugreport) {
+    var errors = bugreport.Errors;
+    for (let i = 0; i < errors.length - 1; i++) {
+        for (let j = 0; j < errors.length - 1; j++) {
+            if (errors[j].ln > errors[j + 1].ln) {
+                var temp = errors[j];
+                errors[j] = errors[j + 1];
+                errors[j + 1] = temp;
+            }
+        }
+    }
+    bugreport.Errors = errors;
+    return bugreport;
 }
