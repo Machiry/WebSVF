@@ -152,8 +152,8 @@ function analyzePLError(partialLeak) {
         "Type": "Semantic",
         "Occurrence": "Dynamic (Run-Time)",
         "Title": "PartialLeak: Memory allocation",
-        "Stack Trace": stackTrace,
-        "Cross Origin": crossOrigin
+        "StackTrace": stackTrace,
+        "CrossOrigin": crossOrigin
     }
     error.Path = memoryAllocationPath;
     return error;
