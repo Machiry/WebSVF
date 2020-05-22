@@ -24,6 +24,8 @@ var bcFilesList = [];
 var filesList = [];
 var filesDir = arguments[0];
 readFileList(filesDir, filesList);
+var allFilesList = [];
+readAllFileList(filesDir, allFilesList);
 filesList.forEach(element => {
     if (element.endWith(".bc")) {
         bcFilesList.push(element);
@@ -79,13 +81,20 @@ function analyzeData_1(output) {
 
     pathSet.forEach((path, index) => {
         var errorsByReport = [];
+        var absolutePath = "";
         errors.forEach(element => {
             if (element.Path == path) {
+                allFilesList.forEach(e => {
+                    if (e.endWith(path)) {
+                        absolutePath = e;
+                    }
+                });
                 delete element.Path;
                 errorsByReport.push(element);
             }
         })
-        var bugreport = new BugReport(index, path, projectPath + path, errorsByReport);
+        absolutePath = absolutePath.substring(0, absolutePath.lastIndexOf("/"));
+        var bugreport = new BugReport(index, path, absolutePath, errorsByReport);
         bugreportsArray.push(bugreport);
     });
     bugreports = {
@@ -129,8 +138,8 @@ function analyzePLError(partialLeak) {
     var crossOrigin = [];
 
     freePathArray.forEach(element => {
-        var freePathPath = getContent(element, "fl: ", ")");
-        if (freePathPath == memoryAllocationPath) {
+        var freePathName = getContent(element, "fl: ", ")");
+        if (freePathName == memoryAllocationPath) {
             var freePathLine = getContent(element, "ln: ", " fl");
             var freePathEle = {
                 "ln": freePathLine,
@@ -139,9 +148,16 @@ function analyzePLError(partialLeak) {
             stackTrace.push(freePathEle);
         } else {
             var freePathLine = getContent(element, "ln: ", " fl");
+            var freePath = "";
+            allFilesList.forEach(file => {
+                if (file.endWith(freePathName)) {
+                    freePath =file;
+                }
+            });
+            freePath = freePath.substring(0, freePath.lastIndexOf("/"));
             var freePathEle = {
-                "FileName": freePathPath,
-                "FilePath": "Absolute Path",
+                "FileName": freePathName,
+                "FilePath": freePath,
                 "ln": freePathLine
             }
             crossOrigin.push(freePathEle);
@@ -184,4 +200,18 @@ function readFileList(dir, filesList = []) {
 
 function unique (arr) {
     return Array.from(new Set(arr))
+}
+
+function readAllFileList(dir, filesList = []) {
+    const files = fs.readdirSync(dir);
+    files.forEach((item, index) => {
+        var fullPath = path.join(dir, item);
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory()) {      
+            readFileList(path.join(dir, item), filesList);
+        } else {                
+            filesList.push(fullPath);                     
+        }        
+    });
+    return filesList;
 }
