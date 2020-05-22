@@ -142,8 +142,8 @@ function analyzePLError(partialLeak) {
         if (freePathName == memoryAllocationPath) {
             var freePathLine = getContent(element, "ln: ", " fl");
             var freePathEle = {
-                "ln": freePathLine,
-                "title": "Conditional free path"
+                "ln": Number(freePathLine),
+                "Title": "Conditional free path"
             }
             stackTrace.push(freePathEle);
         } else {
@@ -158,16 +158,17 @@ function analyzePLError(partialLeak) {
             var freePathEle = {
                 "FileName": freePathName,
                 "FilePath": freePath,
-                "ln": freePathLine
+                "ln": Number(freePathLine)
             }
             crossOrigin.push(freePathEle);
         }
     });
     var error = {
-        "ln": memoryAllocationLine,
+        "ln": Number(memoryAllocationLine),
         "Type": "Semantic",
         "Occurrence": "Dynamic (Run-Time)",
-        "Title": "PartialLeak: Memory allocation",
+        "Title": "PartialLeak",
+        "Description": "Memory allocation",
         "StackTrace": stackTrace,
         "CrossOrigin": crossOrigin
     }
@@ -179,10 +180,13 @@ function analyzeNFError(neverFree) {
     var neverFreeLine = getContent(neverFree, "ln: ", " fl");
     var neverFreePath = getContent(neverFree, "fl: ", ")");
     var error = {
-        "ln": neverFreeLine,
+        "ln": Number(neverFreeLine),
         "Type": "Semantic",
+        "Title": "NeverFree",
         "Occurrence": "Dynamic (Run-Time)",
-        "Title": "NeverFree: memory allocation",
+        "Description": "memory allocation",
+        "StackTrace": [],
+        "CrossOrigin": []
     };
     error.Path = neverFreePath;
     return error;
